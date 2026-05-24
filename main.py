@@ -6,6 +6,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder,StandardScaler
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import root_mean_squared_error
+from sklearn.model_selection import cross_val_score
 
 # Load the dataset
 housing = pd.read_csv("housing.csv")
@@ -47,6 +52,28 @@ full_pipeline = ColumnTransformer([
 
 # Transform the data using the full pipeline
 housing_prepared = full_pipeline.fit_transform(housing)
-print(housing_prepared)
+# print(housing_prepared)
+
+# Train a Linear Regression model
+linear_regressor = LinearRegression()
+linear_regressor.fit(housing_prepared, houing_labels)
+lin_preds = linear_regressor.predict(housing_prepared)
+lin_mse = root_mean_squared_error(houing_labels, lin_preds)
+print("Linear Regression RMSE:", lin_mse)
 
 
+# Train a Decision Tree Regressor
+tree_regressor = DecisionTreeRegressor(random_state=42)
+tree_regressor.fit(housing_prepared, houing_labels)
+tree_preds = tree_regressor.predict(housing_prepared)
+# tree_mse = root_mean_squared_error(houing_labels, tree_preds)
+tree_rmse = -cross_val_score(tree_regressor, housing_prepared, houing_labels, scoring="neg_root_mean_squared_error", cv=10)
+# print("Decision Tree RMSE:", tree_rmses)
+print(pd.Series(tree_rmse).describe())
+
+# Train a Random Forest Regressor
+forest_regressor = RandomForestRegressor(random_state=42)
+forest_regressor.fit(housing_prepared, houing_labels)
+forest_preds = forest_regressor.predict(housing_prepared)
+forest_mse = root_mean_squared_error(houing_labels, forest_preds)
+print("Random Forest RMSE:", forest_mse)
