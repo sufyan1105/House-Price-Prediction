@@ -1,3 +1,4 @@
 .DS_store
 .ipynb_checkpoints/
 .vscode/model.pkl
+.vscode/
