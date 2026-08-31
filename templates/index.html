@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estimator — California House Price Prediction</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b16'/%3E%3Cpath d='M6 15 16 7l10 8v10a1 1 0 0 1-1 1h-6v-7h-6v7H7a1 1 0 0 1-1-1z' fill='%235eead4'/%3E%3C/svg%3E">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#07070e;
+  --bg-2:#0b0b16;
+  --panel:rgba(255,255,255,.038);
+  --panel-2:rgba(255,255,255,.055);
+  --stroke:rgba(255,255,255,.09);
+  --stroke-2:rgba(255,255,255,.16);
+  --ink:#f2f2f7;
+  --ink-2:#a5a6b8;
+  --ink-3:#6b6c80;
+  --teal:#5eead4;
+  --violet:#a78bfa;
+  --pink:#f0abfc;
+  --amber:#fbbf24;
+  --rose:#fb7185;
+  --radius:20px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* class-level display rules outrank the UA's [hidden], so restate it */
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.5;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AURORA BACKGROUND
+   ═══════════════════════════════════════════════════════════════ */
+.aurora{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.4;will-change:transform}
+.b1{width:52vw;height:52vw;background:radial-gradient(circle,#3b82f6,transparent 65%);top:-16vw;left:-12vw;animation:drift1 26s ease-in-out infinite}
+.b2{width:46vw;height:46vw;background:radial-gradient(circle,#a855f7,transparent 65%);top:22vh;right:-14vw;animation:drift2 32s ease-in-out infinite}
+.b3{width:40vw;height:40vw;background:radial-gradient(circle,#14b8a6,transparent 65%);bottom:-14vw;left:24vw;animation:drift3 29s ease-in-out infinite}
+.b4{width:30vw;height:30vw;background:radial-gradient(circle,#f43f5e,transparent 68%);bottom:18vh;right:18vw;opacity:.22;animation:drift1 37s ease-in-out infinite reverse}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(9vw,7vh) scale(1.18)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-11vw,10vh) scale(.9)}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(.95)}50%{transform:translate(7vw,-9vh) scale(1.2)}}
+.grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.16;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E")}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 120% 90% at 50% 0%,transparent 30%,rgba(7,7,14,.85) 100%)}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+.wrap{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:0 24px 80px}
+
+header{padding:56px 0 40px;text-align:center}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:7px 15px 7px 11px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--stroke);
+  font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-2);font-weight:600;backdrop-filter:blur(12px);
+  animation:fadeUp .8s cubic-bezier(.2,.7,.3,1) both;
+}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--teal);
+  box-shadow:0 0 0 0 rgba(94,234,212,.6);animation:pulse 2.2s infinite}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(94,234,212,.55)}
+  70%{box-shadow:0 0 0 9px rgba(94,234,212,0)}
+  100%{box-shadow:0 0 0 0 rgba(94,234,212,0)}
+}
+h1{
+  margin:22px 0 14px;
+  font-size:clamp(38px,6.4vw,68px);
+  font-weight:800;letter-spacing:-.045em;line-height:1.02;
+  background:linear-gradient(100deg,#fff 0%,#fff 16%,#7dd3fc 30%,#d8b4fe 42%,#fff 58%,#fff 76%,#5eead4 90%);
+  background-size:210% auto;
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  animation:fadeUp .9s .06s cubic-bezier(.2,.7,.3,1) both, sheen 9s linear infinite;
+}
+@keyframes sheen{to{background-position:220% center}}
+.sub{max-width:600px;margin:0 auto;color:var(--ink-2);font-size:16.5px;
+  animation:fadeUp .9s .14s cubic-bezier(.2,.7,.3,1) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+
+.grid{display:grid;grid-template-columns:.84fr 1.16fr;gap:22px;align-items:start}
+@media(max-width:940px){.grid{grid-template-columns:1fr}}
+
+.card{
+  background:var(--panel);
+  border:1px solid var(--stroke);
+  border-radius:var(--radius);
+  backdrop-filter:blur(22px) saturate(1.4);
+  -webkit-backdrop-filter:blur(22px) saturate(1.4);
+  padding:24px;
+  position:relative;overflow:hidden;
+  animation:fadeUp .9s .2s cubic-bezier(.2,.7,.3,1) both;
+}
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:var(--radius);padding:1px;
+  background:linear-gradient(150deg,rgba(255,255,255,.22),transparent 42%,transparent 62%,rgba(255,255,255,.09));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
+}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px}
+.card-title{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-2)}
+.card-note{font-size:12px;color:var(--ink-3)}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAP
+   ═══════════════════════════════════════════════════════════════ */
+.map-shell{position:relative;border-radius:14px;overflow:hidden;
+  background:linear-gradient(170deg,rgba(10,12,28,.75),rgba(4,5,12,.9));
+  border:1px solid rgba(255,255,255,.06);cursor:crosshair;touch-action:none}
+#map{display:block;width:100%;height:auto}
+.ca-fill{fill:rgba(255,255,255,.028);stroke:rgba(255,255,255,.24);stroke-width:1.4;
+  stroke-linejoin:round;filter:drop-shadow(0 0 14px rgba(94,234,212,.16))}
+.dot{opacity:.72}
+.pin-halo{fill:none;stroke:#fff;stroke-width:1.4;opacity:.9}
+.pin-core{fill:#fff;filter:drop-shadow(0 0 8px rgba(255,255,255,.9))}
+.crosshair{stroke:rgba(255,255,255,.28);stroke-width:.8;stroke-dasharray:5 5}
+@keyframes ring{0%{r:10;opacity:.85}100%{r:46;opacity:0}}
+.ripple{fill:none;stroke:var(--teal);stroke-width:1.6;animation:ring 1.6s ease-out infinite}
+.ripple.two{animation-delay:.55s}
+
+.map-hint{position:absolute;left:14px;bottom:12px;font-size:11.5px;color:var(--ink-3);
+  background:rgba(0,0,0,.42);padding:5px 10px;border-radius:8px;backdrop-filter:blur(8px);
+  pointer-events:none;letter-spacing:.02em}
+.coord{position:absolute;right:14px;top:12px;font-family:var(--mono);font-size:11.5px;
+  color:var(--ink-2);background:rgba(0,0,0,.42);padding:6px 11px;border-radius:8px;
+  backdrop-filter:blur(8px);pointer-events:none}
+
+.legend{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:11px;color:var(--ink-3)}
+.legend-bar{flex:1;height:6px;border-radius:99px;
+  background:linear-gradient(90deg,#4b1a6d,#8b2a90,#c34a86,#e8724f,#f9a13c,#fcfdbf)}
+
+/* city chips */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.chip{
+  padding:6px 12px;border-radius:99px;font-size:12px;font-weight:500;
+  background:rgba(255,255,255,.045);border:1px solid var(--stroke);
+  color:var(--ink-2);cursor:pointer;transition:.22s cubic-bezier(.2,.7,.3,1);
+}
+.chip:hover{background:rgba(255,255,255,.11);color:var(--ink);transform:translateY(-1.5px);border-color:var(--stroke-2)}
+.chip:active{transform:translateY(0)}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESULT
+   ═══════════════════════════════════════════════════════════════ */
+.result{
+  background:linear-gradient(165deg,rgba(94,234,212,.10),rgba(167,139,250,.08) 55%,rgba(240,171,252,.06));
+  border:1px solid rgba(255,255,255,.13);
+}
+.result::after{
+  content:'';position:absolute;top:-60%;left:-60%;width:220%;height:220%;
+  background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.09) 50%,transparent 58%);
+  transform:translateX(-100%);pointer-events:none;
+}
+.result.flash::after{animation:sweep 1.05s cubic-bezier(.3,.7,.3,1)}
+@keyframes sweep{to{transform:translateX(100%)}}
+
+.price-label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+.price{
+  font-size:clamp(42px,7.4vw,62px);font-weight:800;letter-spacing:-.045em;line-height:1.05;
+  margin:8px 0 2px;font-variant-numeric:tabular-nums;
+  background:linear-gradient(100deg,#fff,var(--teal) 55%,var(--violet));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.price.loading{opacity:.42;filter:blur(1px)}
+.price-sub{font-size:13.5px;color:var(--ink-2)}
+.price-sub b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+.band{margin:22px 0 6px}
+.band-track{height:8px;border-radius:99px;background:rgba(255,255,255,.07);position:relative;overflow:hidden}
+.band-fill{position:absolute;top:0;bottom:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--teal),var(--violet),var(--pink));
+  transition:left .55s cubic-bezier(.2,.7,.3,1),width .55s cubic-bezier(.2,.7,.3,1);
+  box-shadow:0 0 16px rgba(167,139,250,.5)}
+.band-marks{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:20px}
+.stat{background:rgba(0,0,0,.24);border:1px solid var(--stroke);border-radius:12px;padding:12px}
+.stat-k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.stat-v{font-size:17px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+
+.truth{margin-top:18px;padding:14px 16px;border-radius:14px;
+  background:rgba(0,0,0,.26);border:1px solid var(--stroke);
+  display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.truth-v{font-size:21px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;
+  display:flex;align-items:baseline;gap:10px}
+.truth-d{font-size:12.5px;font-family:var(--mono);font-weight:600;padding:3px 8px;border-radius:99px}
+.truth-d.near{color:#5eead4;background:rgba(94,234,212,.13)}
+.truth-d.off{color:#fbbf24;background:rgba(251,191,36,.13)}
+.truth-note{font-size:11.5px;color:var(--ink-3);max-width:240px;line-height:1.45}
+.truth-note code{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+
+.warn{margin-top:16px;padding:11px 13px;border-radius:12px;font-size:12.5px;line-height:1.5;
+  background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.28);color:#fcd34d;display:none}
+.warn.on{display:block;animation:fadeUp .45s both}
+
+/* contributions */
+.contrib{margin-top:8px}
+.crow{display:grid;grid-template-columns:118px 1fr 78px;align-items:center;gap:10px;margin-bottom:9px;
+  animation:fadeUp .5s both}
+.cname{font-size:12px;color:var(--ink-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbar{height:9px;background:rgba(255,255,255,.055);border-radius:99px;position:relative;overflow:hidden}
+.cbar i{position:absolute;top:0;bottom:0;left:50%;border-radius:99px;width:0;
+  transition:width .7s cubic-bezier(.2,.7,.3,1),left .7s cubic-bezier(.2,.7,.3,1)}
+.cbar i.pos{background:linear-gradient(90deg,var(--teal),#34d399)}
+.cbar i.neg{background:linear-gradient(90deg,var(--rose),#f97316)}
+.cbar::before{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.18)}
+.cval{font-size:12px;font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.cval.pos{color:#5eead4}.cval.neg{color:#fb7185}
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTROLS
+   ═══════════════════════════════════════════════════════════════ */
+.controls{margin-top:22px}
+.ctl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 30px}
+@media(max-width:700px){.ctl-grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr}}
+
+.field{padding:12px 0}
+.field-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:11px;gap:10px}
+.field-name{font-size:13.5px;font-weight:600}
+.field-help{font-size:11.5px;color:var(--ink-3);display:block;font-weight:400;margin-top:2px}
+.field-val{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--teal);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  padding:3px 9px;border-radius:8px;border:1px solid transparent;cursor:text;
+  transition:.18s cubic-bezier(.2,.7,.3,1)}
+.field-val:hover{border-color:var(--stroke-2);background:rgba(255,255,255,.05)}
+.field-val::after{content:'✎';font-size:9px;opacity:0;margin-left:6px;transition:opacity .18s;
+  vertical-align:middle}
+.field-val:hover::after{opacity:.45}
+
+/* the in-place editor that replaces a readout on click */
+.val-edit{
+  font-family:var(--mono);font-size:14px;font-weight:600;color:#fff;
+  background:rgba(0,0,0,.5);border:1px solid var(--teal);border-radius:8px;
+  padding:3px 9px;width:112px;text-align:right;outline:none;
+  font-variant-numeric:tabular-nums;
+  box-shadow:0 0 0 3px rgba(94,234,212,.16);
+}
+.val-edit.bad{border-color:var(--rose);box-shadow:0 0 0 3px rgba(251,113,133,.18)}
+
+/* block-totals vs per-home mode switch */
+.mode{display:inline-flex;gap:4px;background:rgba(0,0,0,.3);padding:4px;border-radius:11px;
+  border:1px solid var(--stroke)}
+.mode button{padding:6px 13px;border:none;border-radius:8px;background:transparent;
+  color:var(--ink-3);font-size:11.5px;font-weight:600;font-family:var(--font);cursor:pointer;
+  transition:.22s cubic-bezier(.2,.7,.3,1);white-space:nowrap}
+.mode button:hover{color:var(--ink-2)}
+.mode button.on{color:#07070e;background:linear-gradient(135deg,var(--teal),var(--violet));
+  box-shadow:0 3px 12px rgba(94,234,212,.28)}
+
+.derived{margin-top:14px;padding:11px 13px;border-radius:11px;background:rgba(0,0,0,.24);
+  border:1px solid var(--stroke);font-size:11.5px;color:var(--ink-3);line-height:1.55}
+.derived b{color:var(--ink-2);font-weight:600;font-family:var(--mono)}
+
+/* lat/long numeric entry under the map */
+.latlon{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.latlon .field{padding:0}
+.latlon .field-top{margin-bottom:0}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:99px;outline:none;
+  background:linear-gradient(90deg,var(--teal) 0%,var(--violet) var(--p,50%),rgba(255,255,255,.09) var(--p,50%));
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:19px;height:19px;border-radius:50%;background:#fff;
+  border:3px solid #0b0b16;box-shadow:0 0 0 1px rgba(255,255,255,.35),0 3px 12px rgba(0,0,0,.6);
+  cursor:grab;transition:transform .16s cubic-bezier(.2,.7,.3,1),box-shadow .16s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.22);
+  box-shadow:0 0 0 1px rgba(255,255,255,.5),0 0 22px rgba(94,234,212,.65)}
+input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.1)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;
+  border:3px solid #0b0b16;cursor:grab}
+
+/* segmented */
+.seg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;background:rgba(0,0,0,.26);
+  padding:5px;border-radius:14px;border:1px solid var(--stroke)}
+.seg button{
+  padding:9px 4px;border:none;border-radius:10px;background:transparent;color:var(--ink-3);
+  font-size:11.5px;font-weight:600;font-family:var(--font);cursor:pointer;
+  transition:.25s cubic-bezier(.2,.7,.3,1);letter-spacing:.01em;
+}
+.seg button:hover{color:var(--ink-2);background:rgba(255,255,255,.05)}
+.seg button.on{
+  color:#07070e;background:linear-gradient(135deg,var(--teal),var(--violet));
+  box-shadow:0 4px 18px rgba(94,234,212,.34);transform:translateY(-1px);
+}
+
+/* advanced */
+.adv-head{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px 0;cursor:pointer;user-select:none;flex-wrap:wrap}
+.adv-head:hover .adv-title{color:var(--ink)}
+.adv-title{font-size:13px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink-2);display:flex;align-items:center;gap:9px;transition:.2s}
+.caret{transition:transform .35s cubic-bezier(.2,.7,.3,1);font-size:10px;color:var(--ink-3)}
+.adv.open .caret{transform:rotate(90deg)}
+.adv-body{max-height:0;overflow:hidden;transition:max-height .55s cubic-bezier(.2,.7,.3,1),opacity .35s;opacity:0}
+.adv.open .adv-body{max-height:1200px;opacity:1}
+
+.toggle{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.switch{width:38px;height:21px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;
+  transition:.3s cubic-bezier(.2,.7,.3,1);flex:none;border:1px solid var(--stroke)}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+  background:#fff;transition:.3s cubic-bezier(.2,.7,.3,1)}
+.switch.on{background:linear-gradient(135deg,var(--teal),var(--violet));border-color:transparent}
+.switch.on::after{left:20px}
+
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--stroke),transparent);margin:4px 0}
+
+footer{margin-top:44px;padding-top:26px;border-top:1px solid var(--stroke);
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
+footer a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--stroke)}
+footer a:hover{color:var(--teal);border-color:var(--teal)}
+
+@media(max-width:520px){
+  .wrap{padding:0 15px 60px}
+  header{padding:36px 0 28px}
+  .eyebrow{font-size:10px;letter-spacing:.07em;padding:6px 12px 6px 10px;max-width:100%}
+  .card{padding:18px}
+  .seg{grid-template-columns:repeat(2,1fr)}
+  .seg button{padding:10px 4px}
+  .truth{flex-direction:column;align-items:flex-start;gap:10px}
+  .truth-note{max-width:100%}
+  .crow{grid-template-columns:96px 1fr 66px;gap:8px}
+  .cname,.cval{font-size:11px}
+  footer{flex-direction:column;gap:8px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div class="aurora">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <div class="blob b3"></div><div class="blob b4"></div>
+</div>
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow"><span class="pulse"></span> Random Forest · <span id="ntrees">100</span> trees · <span id="nrows">20,640</span> blocks</div>
+    <h1>What is this<br>California block worth?</h1>
+    <p class="sub">Drop a pin, set the neighbourhood profile, and the trained model re-estimates the median house value live — with a real uncertainty band drawn from every tree in the forest.</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- ─────────── MAP ─────────── -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Location</div>
+          <div class="card-note" style="margin-top:4px">Click or drag anywhere on the map</div>
+        </div>
+      </div>
+
+      <div class="map-shell" id="mapShell">
+        <svg id="map" viewBox="0 0 856 990" preserveAspectRatio="xMidYMid meet">
+          <g id="scatter"></g>
+          <path id="ca" class="ca-fill"></path>
+          <g id="pinLayer"></g>
+        </svg>
+        <div class="coord" id="coord">—</div>
+        <div class="map-hint">3,000 sampled training blocks · colour = actual median value</div>
+      </div>
+
+      <div class="legend">
+        <span>$15k</span><div class="legend-bar"></div><span>$500k+</span>
+      </div>
+
+      <div class="latlon">
+        <div class="field"><div class="field-top">
+          <span class="field-name">Latitude</span>
+          <span class="field-val" id="v_latitude"></span></div></div>
+        <div class="field"><div class="field-top">
+          <span class="field-name">Longitude</span>
+          <span class="field-val" id="v_longitude"></span></div></div>
+      </div>
+
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <!-- ─────────── RESULT ─────────── -->
+    <div class="card result" id="resultCard">
+      <div class="price-label">Estimated median house value</div>
+      <div class="price" id="price">$—</div>
+      <div class="price-sub" id="priceSub">Set the inputs to get an estimate</div>
+
+      <div class="band">
+        <div class="band-track"><div class="band-fill" id="bandFill" style="left:40%;width:20%"></div></div>
+        <div class="band-marks"><span>$0</span><span id="bandLabel">80% of trees</span><span>$500k</span></div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-k">Low estimate</div><div class="stat-v" id="sLow">—</div></div>
+        <div class="stat"><div class="stat-k">High estimate</div><div class="stat-v" id="sHigh">—</div></div>
+        <div class="stat"><div class="stat-k">Statewide pct.</div><div class="stat-v" id="sPct">—</div></div>
+      </div>
+
+      <div class="warn" id="warn">
+        <b>Heads up —</b> the training data caps <code>median_house_value</code> at $500,001, so the
+        model physically cannot predict above it. Estimates near this ceiling are floors, not truths.
+      </div>
+
+      <div class="truth" id="truth">
+        <div>
+          <div class="stat-k">Reality check · 30 nearest real blocks</div>
+          <div class="truth-v"><span id="tActual">—</span>
+            <span class="truth-d" id="tDelta"></span></div>
+        </div>
+        <div class="truth-note">Actual recorded median value around this pin, straight from <code>housing.csv</code></div>
+      </div>
+
+      <div class="rule" style="margin:22px 0 16px"></div>
+      <div class="card-title" style="margin-bottom:14px">What is moving this number</div>
+      <div class="contrib" id="contrib"></div>
+      <div class="card-note" style="margin-top:10px">Each bar: change in the estimate versus a statistically average California block.</div>
+    </div>
+  </div>
+
+  <!-- ─────────── CONTROLS ─────────── -->
+  <div class="card controls">
+    <div class="card-head">
+      <div class="card-title">Neighbourhood profile</div>
+      <div class="card-note">Every change re-runs the model</div>
+    </div>
+
+    <div class="field">
+      <div class="field-top">
+        <div><span class="field-name">Ocean proximity</span>
+          <span class="field-help">The one categorical feature — one-hot encoded in the pipeline</span></div>
+      </div>
+      <div class="seg" id="seg"></div>
+    </div>
+
+    <div class="ctl-grid" id="primary"></div>
+
+    <div class="rule" style="margin-top:12px"></div>
+
+    <div class="adv" id="adv">
+      <div class="adv-head">
+        <div class="adv-title" id="advToggle"><span class="caret">▶</span> Block-level detail</div>
+        <label class="toggle" id="autoToggle">
+          <span class="switch on" id="autoSwitch"></span>
+          <span>Auto-fill from the 30 nearest real blocks</span>
+        </label>
+      </div>
+      <div class="adv-body">
+        <div class="card-note" style="margin-bottom:14px;max-width:680px">
+          These features describe an entire census block, not a single home — which is why they are
+          auto-filled from real neighbours by default. Switch auto off to drive them yourself.
+        </div>
+
+        <div class="mode" id="mode" style="margin-bottom:6px">
+          <button data-m="totals">Block totals</button>
+          <button data-m="home">Per home</button>
+        </div>
+
+        <div class="ctl-grid" id="advanced"></div>
+        <div class="ctl-grid" id="perhome" hidden></div>
+
+        <div class="derived" id="derived" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div>California Housing · RandomForestRegressor · median-imputed, standard-scaled, one-hot encoded</div>
+    <div><a href="https://github.com/sufyan1105/House-Price-Prediction" target="_blank" rel="noopener">github.com/sufyan1105</a></div>
+  </footer>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   CONFIG
+   ══════════════════════════════════════════════════════════════ */
+const VB = {w:856, h:990};
+const BOX = {lonMin:-124.6, lonMax:-113.9, latMin:32.3, latMax:42.2};
+
+const CA_OUTLINE = [
+  [-124.21,41.99],[-120.00,41.99],[-120.00,39.00],[-118.00,37.60],[-117.16,36.97],
+  [-114.63,35.00],[-114.57,34.75],[-114.14,34.30],[-114.44,34.08],[-114.72,33.40],
+  [-114.52,33.03],[-114.72,32.72],[-115.50,32.66],[-117.13,32.53],[-117.25,32.90],
+  [-117.60,33.40],[-118.20,33.72],[-118.41,33.77],[-118.80,34.03],[-119.30,34.28],
+  [-119.90,34.42],[-120.47,34.45],[-120.64,34.58],[-120.60,35.10],[-120.90,35.37],
+  [-121.30,35.80],[-121.90,36.30],[-121.94,36.60],[-121.80,36.80],[-122.10,36.95],
+  [-122.40,37.50],[-122.51,37.78],[-122.50,38.00],[-122.98,38.00],[-123.00,38.30],
+  [-123.70,38.90],[-123.75,39.50],[-124.10,40.10],[-124.41,40.44],[-124.10,40.80],
+  [-124.20,41.50],[-124.21,41.99]
+];
+
+const CITIES = [
+  {n:'Los Angeles', lon:-118.24, lat:34.05},
+  {n:'San Francisco', lon:-122.42, lat:37.77},
+  {n:'San Diego', lon:-117.16, lat:32.72},
+  {n:'San Jose', lon:-121.89, lat:37.34},
+  {n:'Sacramento', lon:-121.49, lat:38.58},
+  {n:'Fresno', lon:-119.79, lat:36.74},
+  {n:'Bakersfield', lon:-119.02, lat:35.37},
+  {n:'Santa Barbara', lon:-119.70, lat:34.42},
+  {n:'Palm Springs', lon:-116.55, lat:33.83},
+  {n:'Redding', lon:-122.39, lat:40.59}
+];
+
+const int   = v => Math.round(v).toLocaleString();
+const money0 = v => '$' + Math.round(v).toLocaleString();
+
+// Feature sliders. `wide` = the slider spans the full dataset range rather than p05–p95.
+const PRIMARY = [
+  {k:'median_income', name:'Median household income', help:'Strongest single predictor in the dataset',
+   step:0.05, wide:true, fmt:v=>money0(v*10000), parse:s=>num(s)/10000},
+  {k:'housing_median_age', name:'Median age of homes', help:'Years since the typical home here was built',
+   step:1, wide:true, fmt:v=>Math.round(v)+' yrs'}
+];
+
+const ADVANCED = [
+  {k:'total_rooms', name:'Total rooms in block', help:'Across every home on the block', step:10, fmt:int},
+  {k:'total_bedrooms', name:'Total bedrooms in block', help:'The only feature with missing values in the raw data', step:5, fmt:int},
+  {k:'population', name:'Block population', help:'People living in the block', step:10, fmt:int},
+  {k:'households', name:'Households in block', help:'Occupied dwellings', step:5, fmt:int}
+];
+
+// Per-home view. These are NOT model features — they are ratios the UI converts
+// back into block totals using `households`, which is what the model actually eats.
+const RATIO_OF = {rooms_per_home:'total_rooms', bedrooms_per_home:'total_bedrooms', people_per_home:'population'};
+const PERHOME = [
+  {k:'rooms_per_home', ratio:true, name:'Rooms per home', step:0.1, fmt:v=>v.toFixed(1)+' rooms',
+   help:'The closest thing to “house size” in this dataset — there is no square footage'},
+  {k:'bedrooms_per_home', ratio:true, name:'Bedrooms per home', step:0.05, fmt:v=>v.toFixed(2)+' beds',
+   help:'A block median from census aggregates — it sits near 1.0, not a listing’s bedroom count'},
+  {k:'people_per_home', ratio:true, name:'People per home', step:0.1, fmt:v=>v.toFixed(1)+' people',
+   help:'Household occupancy across the block'},
+  {k:'households', scale:true, name:'Homes in the block', step:5, fmt:int,
+   help:'Scales the three ratios above into the block totals the model reads'}
+];
+
+const LABELS = {
+  location:'Where it is', median_income:'Median income', housing_median_age:'Home age',
+  total_rooms:'Total rooms', total_bedrooms:'Total bedrooms', population:'Population',
+  households:'Households', ocean_proximity:'Ocean proximity'
+};
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════ */
+let META = null;
+let AUTO = true;
+const S = {
+  longitude:-118.24, latitude:34.05, housing_median_age:29, total_rooms:2127,
+  total_bedrooms:435, population:1166, households:409, median_income:3.53,
+  ocean_proximity:'<1H OCEAN'
+};
+
+/* ══════════════════════════════════════════════════════════════
+   PROJECTION + COLOUR
+   ══════════════════════════════════════════════════════════════ */
+const px = lon => (lon - BOX.lonMin) / (BOX.lonMax - BOX.lonMin) * VB.w;
+const py = lat => (BOX.latMax - lat) / (BOX.latMax - BOX.latMin) * VB.h;
+const unx = x => BOX.lonMin + x / VB.w * (BOX.lonMax - BOX.lonMin);
+const uny = y => BOX.latMax - y / VB.h * (BOX.latMax - BOX.latMin);
+
+const MAGMA = [[24,15,46],[62,20,86],[132,35,111],[210,72,93],[249,150,60],[252,253,191]];
+function magma(t){
+  t = Math.max(0, Math.min(1, t)) * (MAGMA.length - 1);
+  const i = Math.min(Math.floor(t), MAGMA.length - 2), f = t - i;
+  const a = MAGMA[i], b = MAGMA[i+1];
+  return `rgb(${Math.round(a[0]+(b[0]-a[0])*f)},${Math.round(a[1]+(b[1]-a[1])*f)},${Math.round(a[2]+(b[2]-a[2])*f)})`;
+}
+const money = v => '$' + Math.round(v).toLocaleString('en-US');
+const moneyK = v => v >= 1000 ? '$' + (v/1000).toFixed(0) + 'k' : '$' + Math.round(v);
+
+/* ══════════════════════════════════════════════════════════════
+   MAP RENDER
+   ══════════════════════════════════════════════════════════════ */
+function drawOutline(){
+  const d = CA_OUTLINE.map((p,i) => (i?'L':'M') + px(p[0]).toFixed(1) + ' ' + py(p[1]).toFixed(1)).join(' ') + ' Z';
+  document.getElementById('ca').setAttribute('d', d);
+}
+
+function drawScatter(points){
+  const g = document.getElementById('scatter');
+  let s = '';
+  for (const [lon, lat, val] of points){
+    // Clip the dark end of magma so low-value blocks stay visible on a dark ground.
+    const t = 0.22 + 0.78 * Math.min(1, (val - 15000) / 470000);
+    s += `<circle class="dot" cx="${px(lon).toFixed(1)}" cy="${py(lat).toFixed(1)}" r="2.9" fill="${magma(t)}"/>`;
+  }
+  g.innerHTML = s;
+}
+
+function drawPin(){
+  const x = px(S.longitude).toFixed(1), y = py(S.latitude).toFixed(1);
+  document.getElementById('pinLayer').innerHTML = `
+    <line class="crosshair" x1="0" y1="${y}" x2="${VB.w}" y2="${y}"/>
+    <line class="crosshair" x1="${x}" y1="0" x2="${x}" y2="${VB.h}"/>
+    <circle class="ripple" cx="${x}" cy="${y}" r="10"/>
+    <circle class="ripple two" cx="${x}" cy="${y}" r="10"/>
+    <circle class="pin-halo" cx="${x}" cy="${y}" r="11"/>
+    <circle class="pin-core" cx="${x}" cy="${y}" r="4.5"/>`;
+  document.getElementById('coord').textContent =
+    `${Math.abs(S.latitude).toFixed(2)}°N  ${Math.abs(S.longitude).toFixed(2)}°W`;
+}
+
+function pointFromEvent(e){
+  const svg = document.getElementById('map');
+  const r = svg.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * VB.w;
+  const y = (e.clientY - r.top) / r.height * VB.h;
+  return {
+    lon: Math.max(BOX.lonMin, Math.min(BOX.lonMax, unx(x))),
+    lat: Math.max(BOX.latMin, Math.min(BOX.latMax, uny(y)))
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONTROLS
+   ══════════════════════════════════════════════════════════════ */
+/* Pull a number out of anything the user types: "$35,499", "1 411", "5.4 rooms". */
+function num(s){
+  const v = parseFloat(String(s).replace(/[^0-9.\-]/g, ''));
+  return isFinite(v) ? v : NaN;
+}
+
+/* Click a readout to type an exact value. Enter commits, Escape cancels. */
+function makeEditable(out, o){
+  out.title = 'Click to type an exact value';
+  out.addEventListener('click', () => {
+    if (out.dataset.editing) return;
+    out.dataset.editing = '1';
+
+    const inp = document.createElement('input');
+    inp.className = 'val-edit';
+    inp.type = 'text';
+    inp.inputMode = 'decimal';
+    inp.value = String(o.fmt(o.get())).replace(/[^0-9.\-]/g, '');
+    out.replaceWith(inp);
+    inp.focus(); inp.select();
+
+    const finish = commit => {
+      if (inp.dataset.done) return;
+      inp.dataset.done = '1';
+      let changed = false;
+      if (commit){
+        const v = o.parse(inp.value);
+        if (isFinite(v)){ o.set(Math.max(o.lo, Math.min(o.hi, v))); changed = true; }
+      }
+      inp.replaceWith(out);
+      delete out.dataset.editing;
+      o.render();
+      if (changed) o.commit();
+    };
+
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+    });
+    inp.addEventListener('blur', () => finish(true));
+    inp.addEventListener('input', () => {
+      const v = o.parse(inp.value);
+      inp.classList.toggle('bad', inp.value.trim() !== '' && !isFinite(v));
+    });
+  });
+}
+
+const RENDER = [];   // every field's redraw function
+
+/* One slider + editable readout, driven by an arbitrary get/set pair. */
+function buildField(spec, host){
+  const st = spec.ratio ? META.ratios[spec.k] : META.stats[spec.k];
+  const lo = spec.ratio ? st.min : (spec.wide ? st.min : st.p05);
+  const hi = spec.ratio ? st.max : (spec.wide ? st.max : st.p95);
+  // Typing is allowed across the full observed range, not just the slider's window.
+  const editLo = st.min, editHi = st.max;
+
+  const get = spec.ratio ? (() => S[RATIO_OF[spec.k]] / S.households) : (() => S[spec.k]);
+  const set = spec.ratio
+    // A ratio change rescales one block total against the current home count.
+    ? (v => { S[RATIO_OF[spec.k]] = v * S.households; })
+    : spec.scale
+      // Changing the home count in per-home mode keeps the ratios and scales the totals.
+      ? (v => {
+          const r = {};
+          for (const key in RATIO_OF) r[key] = S[RATIO_OF[key]] / S.households;
+          S.households = v;
+          for (const key in RATIO_OF) S[RATIO_OF[key]] = r[key] * v;
+        })
+      : (v => { S[spec.k] = v; });
+
+  const el = document.createElement('div');
+  el.className = 'field';
+  el.innerHTML = `
+    <div class="field-top">
+      <div><span class="field-name">${spec.name}</span><span class="field-help">${spec.help}</span></div>
+      <span class="field-val"></span>
+    </div>
+    <input type="range" min="${lo}" max="${hi}" step="${spec.step}">`;
+  host.appendChild(el);
+
+  const range = el.querySelector('input[type=range]');
+  const out   = el.querySelector('.field-val');
+
+  const render = () => {
+    const v = get();
+    out.textContent = spec.fmt(v);
+    range.value = Math.max(lo, Math.min(hi, v));
+    range.style.setProperty('--p', ((range.value - lo) / (hi - lo) * 100).toFixed(1) + '%');
+    // A typed value outside the slider's window still shows correctly in the readout.
+    out.style.color = (v < lo - 1e-9 || v > hi + 1e-9) ? 'var(--amber)' : '';
+  };
+
+  range.addEventListener('input', () => { set(+range.value); renderAll(); schedule(); });
+
+  makeEditable(out, {
+    get, set, render,
+    fmt: spec.fmt,
+    parse: spec.parse || num,
+    lo: editLo, hi: editHi,
+    commit: () => { renderAll(); schedule(); }
+  });
+
+  render();
+  RENDER.push(render);
+  return render;
+}
+
+function renderAll(){
+  RENDER.forEach(f => f());
+  const d = document.getElementById('derived');
+  if (!d.hidden){
+    d.innerHTML = `The model receives <b>${int(S.total_rooms)}</b> rooms, <b>${int(S.total_bedrooms)}</b> bedrooms
+      and <b>${int(S.population)}</b> people across <b>${int(S.households)}</b> homes.`;
+  }
+}
+
+function buildSegmented(){
+  const seg = document.getElementById('seg');
+  seg.innerHTML = '';
+  META.ocean_categories.forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = c;
+    b.className = c === S.ocean_proximity ? 'on' : '';
+    b.onclick = () => {
+      S.ocean_proximity = c;
+      [...seg.children].forEach(x => x.classList.toggle('on', x === b));
+      schedule();
+    };
+    seg.appendChild(b);
+  });
+}
+
+function buildChips(){
+  const host = document.getElementById('chips');
+  CITIES.forEach(c => {
+    const b = document.createElement('div');
+    b.className = 'chip';
+    b.textContent = c.n;
+    b.onclick = () => { S.longitude = c.lon; S.latitude = c.lat; drawPin(); onMove(); };
+    host.appendChild(b);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NUMBER ANIMATION
+   ══════════════════════════════════════════════════════════════ */
+let animFrom = 0, animRAF = null;
+function animatePrice(to){
+  const el = document.getElementById('price');
+  const from = animFrom, t0 = performance.now(), dur = 900;
+  cancelAnimationFrame(animRAF);
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 4);
+    el.textContent = money(from + (to - from) * e);
+    if (p < 1) animRAF = requestAnimationFrame(tick); else animFrom = to;
+  };
+  animRAF = requestAnimationFrame(tick);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PREDICT
+   ══════════════════════════════════════════════════════════════ */
+let timer = null, inflight = 0;
+function schedule(delay = 160){
+  clearTimeout(timer);
+  document.getElementById('price').classList.add('loading');
+  timer = setTimeout(predict, delay);
+}
+
+async function predict(){
+  const id = ++inflight;
+  let d;
+  try {
+    const res = await fetch('/api/predict', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(S)
+    });
+    d = await res.json();
+  } catch (err) {
+    document.getElementById('priceSub').textContent = 'Could not reach the model server.';
+    return;
+  }
+  if (id !== inflight) return;
+
+  const priceEl = document.getElementById('price');
+  priceEl.classList.remove('loading');
+  animatePrice(d.price);
+
+  const card = document.getElementById('resultCard');
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+
+  document.getElementById('priceSub').innerHTML =
+    `<b>±${moneyK(d.std)}</b> spread across the forest · ${META.n_trees} trees voted`;
+
+  document.getElementById('sLow').textContent  = moneyK(d.low);
+  document.getElementById('sHigh').textContent = moneyK(d.high);
+  const pct = Math.round(d.percentile);
+  const suffix = (pct % 10 === 1 && pct !== 11) ? 'st' : (pct % 10 === 2 && pct !== 12) ? 'nd'
+               : (pct % 10 === 3 && pct !== 13) ? 'rd' : 'th';
+  document.getElementById('sPct').textContent = pct + suffix;
+
+  const l = Math.max(0, Math.min(100, d.low / 500001 * 100));
+  const w = Math.max(1.2, Math.min(100 - l, (d.high - d.low) / 500001 * 100));
+  const bf = document.getElementById('bandFill');
+  bf.style.left = l + '%'; bf.style.width = w + '%';
+
+  document.getElementById('warn').classList.toggle('on', !!d.capped);
+
+  if (NEIGHBOUR != null){
+    document.getElementById('tActual').textContent = money(NEIGHBOUR);
+    const gap = (d.price - NEIGHBOUR) / NEIGHBOUR * 100;
+    const el = document.getElementById('tDelta');
+    el.textContent = (gap >= 0 ? '+' : '−') + Math.abs(gap).toFixed(1) + '% vs. estimate';
+    el.className = 'truth-d ' + (Math.abs(gap) <= 15 ? 'near' : 'off');
+  }
+
+  if (d.contributions) renderContrib(d.contributions);
+}
+
+function renderContrib(rows){
+  const host = document.getElementById('contrib');
+  const max = Math.max(...rows.map(r => Math.abs(r.delta)), 1);
+  host.innerHTML = rows.slice(0, 6).map((r, i) => {
+    const pct = Math.abs(r.delta) / max * 50;
+    const pos = r.delta >= 0;
+    return `<div class="crow" style="animation-delay:${i*45}ms">
+      <div class="cname">${LABELS[r.feature] || r.feature}</div>
+      <div class="cbar"><i class="${pos?'pos':'neg'}" style="left:${pos?50:50-pct}%;width:${pct}%"></i></div>
+      <div class="cval ${pos?'pos':'neg'}">${pos?'+':'−'}${moneyK(Math.abs(r.delta))}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   AUTOFILL ON MOVE
+   ══════════════════════════════════════════════════════════════ */
+let moveTimer = null;
+let NEIGHBOUR = null;   // actual recorded median value near the pin
+
+function onMove(){
+  clearTimeout(moveTimer);
+  document.getElementById('price').classList.add('loading');
+  moveTimer = setTimeout(async () => {
+    // Always fetch: even with auto-fill off we want the ground-truth comparison.
+    try {
+      const r = await fetch(`/api/autofill?longitude=${S.longitude}&latitude=${S.latitude}`);
+      const a = await r.json();
+      NEIGHBOUR = a.neighbourhood_median_value;
+
+      if (AUTO){
+        ['total_rooms','total_bedrooms','population','households','housing_median_age']
+          .forEach(k => S[k] = a[k]);
+        S.ocean_proximity = a.ocean_proximity;
+        [...document.getElementById('seg').children]
+          .forEach(b => b.classList.toggle('on', b.textContent === S.ocean_proximity));
+        renderAll();
+      }
+    } catch(e){ /* non-fatal — prediction still works */ }
+    predict();
+  }, 170);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════════════ */
+(async function boot(){
+  META = await (await fetch('/api/meta')).json();
+
+  document.getElementById('ntrees').textContent = META.n_trees;
+  document.getElementById('nrows').textContent = META.n_rows.toLocaleString();
+
+  // seed medians
+  ['housing_median_age','total_rooms','total_bedrooms','population','households','median_income']
+    .forEach(k => S[k] = META.stats[k].median);
+  S.longitude = -118.24; S.latitude = 34.05;
+
+  drawOutline();
+  drawScatter(META.scatter);
+  drawPin();
+  buildChips();
+  buildSegmented();
+
+  PRIMARY.forEach(s  => buildField(s, document.getElementById('primary')));
+  ADVANCED.forEach(s => buildField(s, document.getElementById('advanced')));
+  PERHOME.forEach(s  => buildField(s, document.getElementById('perhome')));
+
+  // Latitude / longitude as typed values, sharing the same editor.
+  [['latitude', v => v.toFixed(2)], ['longitude', v => v.toFixed(2)]].forEach(([k, fmt]) => {
+    const out = document.getElementById('v_' + k);
+    const st = META.stats[k];
+    const render = () => { out.textContent = fmt(S[k]); };
+    makeEditable(out, {
+      get: () => S[k], set: v => { S[k] = v; }, render, fmt,
+      parse: num, lo: st.min, hi: st.max,
+      commit: () => { drawPin(); onMove(); }
+    });
+    render();
+    RENDER.push(render);
+  });
+
+  // Block totals ⇄ per home
+  const modeBtns = [...document.getElementById('mode').children];
+  const setMode = m => {
+    modeBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m));
+    document.getElementById('advanced').hidden = (m !== 'totals');
+    document.getElementById('perhome').hidden  = (m !== 'home');
+    document.getElementById('derived').hidden  = (m !== 'home');
+    renderAll();
+  };
+  modeBtns.forEach(b => b.onclick = () => setMode(b.dataset.m));
+  setMode('totals');
+
+  // map interaction
+  const shell = document.getElementById('mapShell');
+  let dragging = false;
+  const apply = e => { const p = pointFromEvent(e); S.longitude = p.lon; S.latitude = p.lat; drawPin(); onMove(); };
+  shell.addEventListener('pointerdown', e => { dragging = true; shell.setPointerCapture(e.pointerId); apply(e); });
+  shell.addEventListener('pointermove', e => { if (dragging) apply(e); });
+  shell.addEventListener('pointerup',   e => { dragging = false; });
+  shell.addEventListener('pointercancel', () => { dragging = false; });
+
+  // advanced panel
+  const adv = document.getElementById('adv');
+  document.getElementById('advToggle').onclick = () => adv.classList.toggle('open');
+  document.getElementById('autoToggle').onclick = e => {
+    e.preventDefault();
+    AUTO = !AUTO;
+    document.getElementById('autoSwitch').classList.toggle('on', AUTO);
+    if (AUTO) onMove();
+  };
+
+  onMove();
+})();
+</script>
+</body>
+</html>

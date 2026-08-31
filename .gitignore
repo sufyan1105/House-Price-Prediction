@@ -1,4 +1,14 @@
 .DS_Store
 .ipynb_checkpoints/
-model.pkl
 .vscode/
+
+# Trained artefacts — regenerate on first run of main.py / app.py
+model.pkl
+pipeline.pkl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
